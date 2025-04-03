@@ -1,0 +1,37 @@
+#codebuild版本
+version: 0.2
+
+phases: #执行环节
+  install: #安装
+    runtime-versions: #安装编译程序
+      nodejs: 16
+  pre_build: #预构筑，一般用于登陆ECR
+    commands:
+      #登陆ECR 以下为写法 从AWS账号开始可直接在ECR那里复制
+      #aws ecr get-login-password --region 地区 | docker login --username AWS --password-stdin ECR路径
+      - aws ecr get-login-password --region ap-northeast-1 | docker login --username AWS --password-stdin 160885268535.dkr.ecr.ap-northeast-1.amazonaws.com/itecr
+      - echo Nothing to do in the pre_build phase... #日志
+  build: #构筑
+    commands:
+      - echo Build started on `date` #日志
+      - npm install 
+      - echo npm install completed on `date` #日志
+      - npm run build #开始构筑
+      - echo npm run build completed on `date` #日志
+      #date命令获取日期作为标签
+      - TAG='date "+%Y%m%d%H%M%S"'
+      #build镜像
+      #- docker build -t ECR路径:标签 ./       以ECR路径作为镜像名称可少执行一次tag命令
+      - docker build -t 160885268535.dkr.ecr.ap-northeast-1.amazonaws.com/itecr:$TAG ./ 
+      #推送镜像
+      - docker push 160885268535.dkr.ecr.ap-northeast-1.amazonaws.com/itecr:$TAG 
+  post_build: #后构筑
+    commands: 
+      - echo Build completed on `date` #日志
+      #创建一个在源代码根目录中名为imagedefinitions.json的文件
+      #- printf '[{"name":"容器名","imageUri":"%s"}]' ECR路径 > imagedefinitions.json （不把路径直接写在uri后面可提高扩展性）
+      - printf '[{"name":"it-httpd","imageUri":"%s"}]' 160885268535.dkr.ecr.ap-northeast-1.amazonaws.com/itecr:$TAG > imagedefinitions.json
+      - cat imagedefinitions.json
+artifacts: #构筑后产物（用于下一步骤引用）
+  files:
+    - imagedefinitions.json
